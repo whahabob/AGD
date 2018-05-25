@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class LevelGeneration : MonoBehaviour
 {
+    private const bool DEBUG_MODE = true;
+
     [Header("Initial Map Values")]
     [SerializeField] private int _mapWidth;
     [SerializeField] private int _mapHeight;
@@ -18,14 +20,22 @@ public class LevelGeneration : MonoBehaviour
     [Tooltip("Amount of fill required for the level to be considered \"Worthy\" to use.")]
     [SerializeField] [Range(0, 1)] private float _minimumFillPercentage;
 
-    [Header("Level Creation")]
+    [Header("Level Creation - Prefabs")]
     [SerializeField] private GameObject _wall;
     [SerializeField] private GameObject _floor;
-    [SerializeField] private float _wallOffset, _floorOffset;
 
-    [Header("Entity Spawning")]
-    [SerializeField] private GameObject _player;
+    [Header("Level Creation - Offsets")]
+    [SerializeField] private float _wallOffset;
+    [SerializeField] private float _floorOffset;
+
+    [Header("Entity Spawning - Prefabs")]
+    [SerializeField] private GameObject _playerSpawner;
+    [SerializeField] private GameObject _endOfLevel;
+
+    [Header("Entity Spawning - Offsets")]
+    [SerializeField] private float _minimumLengthBetween;
     [SerializeField] private float _playerOffset;
+    [SerializeField] private float _endOfLevelOffset;
 
     private int[,] Map { get; set; }
     private bool[,] Visited { get; set; }
@@ -145,7 +155,51 @@ public class LevelGeneration : MonoBehaviour
                 go.transform.parent = transform;
             }
         }
-     
+
+        float lengthSpawnToEnd = 0;
+        GameObject playerSpawner = Instantiate(_playerSpawner);
+        GameObject endLevel = Instantiate(_endOfLevel);
+
+        while (lengthSpawnToEnd < _minimumLengthBetween)
+        {
+            InitializeSpawnAndEndLocation(ref playerSpawner, ref endLevel);
+            lengthSpawnToEnd = Vector3.Distance(playerSpawner.transform.position, endLevel.transform.position);
+        }
+
+        if (DEBUG_MODE)
+            Debug.Log("Length between spawn and end: " + lengthSpawnToEnd);
+    }
+
+    private void InitializeSpawnAndEndLocation(ref GameObject playerSpawner, ref GameObject endLevel)
+    {
+        Vector2Int spawnLocation = FindRandomEntityLocation(3);
+        playerSpawner.transform.position = new Vector3(
+            spawnLocation.x * playerSpawner.transform.localScale.x,
+            _playerOffset,
+            spawnLocation.y * playerSpawner.transform.localScale.z);
+
+        spawnLocation = FindRandomEntityLocation(3);
+        endLevel.transform.position = new Vector3(
+            spawnLocation.x * endLevel.transform.localScale.x,
+            _endOfLevelOffset,
+            spawnLocation.y * endLevel.transform.localScale.z);
+    }
+
+    private Vector2Int FindRandomEntityLocation(int minNeighbours = 0, int maxNeighbours = 8)
+    {
+        Vector2Int location = Vector2Int.zero;
+        bool foundLocation = false;
+
+        while (!foundLocation)
+        {
+            location = new Vector2Int(Random.Range(0, _mapWidth), Random.Range(0, _mapHeight));
+            if (Map[location.x, location.y] == 0)
+                if (GetAliveNeighbourCount(location.x, location.y) >= minNeighbours &&
+                    GetAliveNeighbourCount(location.x, location.y) <= maxNeighbours)
+                    foundLocation = true;
+        }
+
+        return location;
     }
 
     /// <summary>
@@ -157,9 +211,12 @@ public class LevelGeneration : MonoBehaviour
         {
             Destroy(transform.GetChild(i).gameObject);
         }
+
+        Destroy(GameObject.FindGameObjectWithTag("PlayerSpawner"));
+        Destroy(GameObject.FindGameObjectWithTag("LevelEnding"));
     }
 
-    #region UtilityMethods
+#region UtilityMethods
 
     /// <summary>
     /// Searches in all 8 tiles around the tile at the given position for how many walls there are surrounding the current one.
@@ -227,10 +284,10 @@ public class LevelGeneration : MonoBehaviour
         FloodFill(x + 1, y);
     }
 
-    #endregion
+#endregion
 
 
-    #region Unity Methods
+#region Unity Methods
 
     private void Start ()
     {
@@ -240,10 +297,8 @@ public class LevelGeneration : MonoBehaviour
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.R))
-        {
             GenerateLevel();
-        }
     }
     
-    #endregion
+#endregion
 }
