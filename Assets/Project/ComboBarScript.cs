@@ -20,8 +20,9 @@ public class ComboBarScript : MonoBehaviour {
 
 	// Use this for initialization
 	void Start () {
-		if (GameObject.FindGameObjectWithTag("Player").GetComponent<PlayerStats> ())
-			playerStats = GameObject.FindGameObjectWithTag("Player").GetComponent<PlayerStats> ();
+        if (GameObject.FindGameObjectWithTag("Player"))
+		    if (GameObject.FindGameObjectWithTag("Player").GetComponent<PlayerStats> ())
+			    playerStats = GameObject.FindGameObjectWithTag("Player").GetComponent<PlayerStats> ();
 		canvasGroup = GetComponent<CanvasGroup>();
 		canvasGroup.alpha = 0;
 	}
@@ -30,11 +31,6 @@ public class ComboBarScript : MonoBehaviour {
 	void Update () {
 		if (!playerStats)
 			playerStats = GameObject.FindGameObjectWithTag("Player").GetComponent<PlayerStats> ();
-
-		if (!canvasGroup) {
-			Debug.Log ("HUH?!");
-			canvasGroup = GetComponent<CanvasGroup> ();
-		}
 
 		BonusTimer ();
 		UpdateBonus ();

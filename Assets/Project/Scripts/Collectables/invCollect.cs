@@ -22,20 +22,20 @@ public class invCollect : MonoBehaviour {
 
     void OnCollisionEnter(Collision col)
     {
-        Debug.Log("Komt hierin begin");
+       // Debug.Log("Komt hierin begin");
         if (col.gameObject.tag == "Coin")
         {
-            Debug.Log("Komt hierin");
+          //  Debug.Log("Komt hierin");
             foreach (Transform child in inventoryPanel.transform)
             {
-                Debug.Log("Komt hierin foreach");
+            //    Debug.Log("Komt hierin foreach");
                 if (child.gameObject.tag == "Coin")
                 {
-                    Debug.Log("Komt hierin child");
+              //      Debug.Log("Komt hierin child");
                     string c = child.Find("Text").GetComponentInChildren<Text>().text;
-                    Debug.Log("heeft gereturned" + c);
+                //    Debug.Log("heeft gereturned" + c);
                     tcount = System.Int32.Parse(c) + 1;
-                    Debug.Log("heeft gereturned after" + tcount);
+                  //  Debug.Log("heeft gereturned after" + tcount);
                     child.Find("Text").GetComponentInChildren<Text>().text = "" + tcount;
                     AudioSource.PlayClipAtPoint(coinCollect, transform.position);
                     PlayerStats.score++;
