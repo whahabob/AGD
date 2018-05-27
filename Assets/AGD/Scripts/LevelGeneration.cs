@@ -16,6 +16,11 @@ public class LevelGeneration : MonoBehaviour
     [SerializeField] [Range(0, 5)] private int _birthLimit;
     [SerializeField] [Range(0, 5)] private int _starvationLimit;
 
+    [Header("Level Generation - Entities")]
+    [SerializeField] private float _minimumLengthBetweenSpawnAndEnd;
+    [SerializeField] private float _minimumLengthBetweenEnemies;
+    [SerializeField] [Range(0, 10)] private int _amountOfEnemies;
+
     [Header("Level Confirmation")]
     [Tooltip("Amount of fill required for the level to be considered \"Worthy\" to use.")]
     [SerializeField] [Range(0, 1)] private float _minimumFillPercentage;
@@ -30,16 +35,24 @@ public class LevelGeneration : MonoBehaviour
 
     [Header("Entity Spawning - Prefabs")]
     [SerializeField] private GameObject _playerSpawner;
+    [SerializeField] private GameObject _enemySpawner;
     [SerializeField] private GameObject _endOfLevel;
 
     [Header("Entity Spawning - Offsets")]
-    [SerializeField] private float _minimumLengthBetween;
     [SerializeField] private float _playerOffset;
+    [SerializeField] private float _enemySpawnerOffset;
     [SerializeField] private float _endOfLevelOffset;
 
+    private GameObject EntitiesParent { get; set; }
     private int[,] Map { get; set; }
     private bool[,] Visited { get; set; }
 
+    /// <summary>
+    /// Initializes the base of the map. Meaning a completely random map, with
+    /// walls at the bounds, to make sure there won't be an opening. As well as
+    /// an empty horizontal line in the middle of the map, to avoid big 
+    /// vertical areas.
+    /// </summary>
     private void InitializeMap()
     {
         Map = new int[_mapWidth, _mapHeight];
@@ -60,6 +73,9 @@ public class LevelGeneration : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Change the map based on the amount of neighbours each node has. 
+    /// </summary>
     private void DoSimulationStep()
     {
         int[,] newMap = new int[_mapWidth, _mapHeight];
@@ -82,23 +98,34 @@ public class LevelGeneration : MonoBehaviour
     }
 
     /// <summary>
-    /// Find a random walkable position in the map and from that point start the flood filling algorithm to make sure
-    /// 
+    /// Find a random walkable position in the map and from that point start 
+    /// the flood filling algorithm to make sure there will be no random areas
+    /// that you are unable to walk to. This is to avoid spawns outside of the
+    /// playable area.
     /// </summary>
     private void FixLevelGaps()
     {
+        //Initialize the visited 2d array, to make sure the walls are already
+        //visited.
         for (int xi = 0; xi < _mapWidth; xi++)
             for (int yi = 0; yi < _mapHeight; yi++)
                 Visited[xi, yi] = Map[xi, yi] == 1 ? true : false;
 
         int tileType = 1;
         Vector2Int tilePosition = Vector2Int.zero;
+
+        //While the tile type is not 0, which means an empty tile, keep 
+        //searching for a random starting position to start the flood filling
+        //algorithm.
         while (tileType != 0)
         {
-            tilePosition = new Vector2Int(Random.Range(0, _mapWidth), Random.Range(0, _mapHeight));
+            tilePosition = new Vector2Int(
+                Random.Range(0, _mapWidth), 
+                Random.Range(0, _mapHeight));
             tileType = Map[tilePosition.x, tilePosition.y];
         }
 
+        //Call the flood fill algorithm from a random position.
         FloodFill(tilePosition.x, tilePosition.y);
 
         for (int x = 0; x < _mapWidth; x++)
@@ -107,10 +134,11 @@ public class LevelGeneration : MonoBehaviour
     }
 
     /// <summary>
-    /// Used to find the size of the level, which is calculated by dividing the size of all the walkable tiles by the 
-    /// amount of total tiles in the map.
+    /// Used to find the size of the level, which is calculated by dividing the 
+    /// size of all the walkable tiles by the amount of total tiles in the map.
     /// </summary>
-    /// <returns> A percentage which represents the size of the level relative to the full map </returns>
+    /// <returns> A percentage which represents the size of the level relative 
+    /// to the full map </returns>
     private float FindLevelSize()
     {
         int totalSize = _mapWidth * _mapHeight;
@@ -141,6 +169,7 @@ public class LevelGeneration : MonoBehaviour
             return;
         }
 
+        //Clear the level in case there is already one generated.
         ClearLevel();
 
         for (int x = 0; x < _mapWidth; x++)
@@ -160,31 +189,106 @@ public class LevelGeneration : MonoBehaviour
         GameObject playerSpawner = Instantiate(_playerSpawner);
         GameObject endLevel = Instantiate(_endOfLevel);
 
-        while (lengthSpawnToEnd < _minimumLengthBetween)
+        while (lengthSpawnToEnd < _minimumLengthBetweenSpawnAndEnd)
         {
             InitializeSpawnAndEndLocation(ref playerSpawner, ref endLevel);
-            lengthSpawnToEnd = Vector3.Distance(playerSpawner.transform.position, endLevel.transform.position);
+            lengthSpawnToEnd = Vector3.Distance(
+                playerSpawner.transform.position, 
+                endLevel.transform.position);
         }
 
-        if (DEBUG_MODE)
-            Debug.Log("Length between spawn and end: " + lengthSpawnToEnd);
+        for (int i = 0; i < _amountOfEnemies; i++)
+        {
+            SpawnEnemy(ref playerSpawner, 99);
+        }
     }
 
+    //TODO: Actually fucking comment this. :)
+    private void SpawnEnemy(ref GameObject playerSpawner, int maxTries)
+    {
+        Vector2Int playerLocation = new Vector2Int(
+            (int) (playerSpawner.transform.position.x / playerSpawner.transform.localScale.x),
+            (int) (playerSpawner.transform.position.z / playerSpawner.transform.localScale.z));
+        Vector2Int spawnLocation = Vector2Int.zero;
+
+        GameObject[] enemies = GameObject.FindGameObjectsWithTag("EnemySpawner");
+        
+        int tries = 0;
+        while (tries < maxTries)
+        {
+            spawnLocation = FindRandomEntityLocation();
+
+            if (Vector2Int.Distance(playerLocation, spawnLocation) > _minimumLengthBetweenEnemies)
+            {
+                int tempTries = tries;
+                tries = maxTries;
+
+                if (enemies.Length != 0)
+                {
+                    for (int i = 0; i < enemies.Length; i++)
+                    {
+                        Vector2Int enemyLocation = new Vector2Int(
+                            (int)(enemies[i].transform.position.x / enemies[i].transform.localScale.x),
+                            (int)(enemies[i].transform.position.z / enemies[i].transform.localScale.z));
+
+                        if (Vector2Int.Distance(enemyLocation, spawnLocation) < _minimumLengthBetweenEnemies)
+                        {
+                            tries = tempTries;
+                        }
+                    }
+                }
+            }
+
+            tries++;
+        }
+
+        //Even if we failed to get a good distance between other enemies, 
+        //at least make sure the distance from the player is bigger than the
+        //minimum to avoid getting attacked while spawning in.
+        if (Vector2Int.Distance(playerLocation, spawnLocation) > _minimumLengthBetweenEnemies)
+        {
+            GameObject enemy = Instantiate(_enemySpawner);
+            enemy.transform.position = new Vector3(
+                spawnLocation.x * enemy.transform.localScale.x,
+                _enemySpawnerOffset,
+                spawnLocation.y * enemy.transform.localScale.z);
+            enemy.transform.parent = EntitiesParent.transform;
+        }
+    }
+
+    /// <summary>
+    /// Initializes the spawn location and end of level location and passes it 
+    /// to the referenced GameObjects.
+    /// </summary>
+    /// <param name="playerSpawner">A reference to the player spawner object</param>
+    /// <param name="endLevel">A reference to the end of the level object</param>
     private void InitializeSpawnAndEndLocation(ref GameObject playerSpawner, ref GameObject endLevel)
     {
+        //Player Spawner 
         Vector2Int spawnLocation = FindRandomEntityLocation(3);
         playerSpawner.transform.position = new Vector3(
             spawnLocation.x * playerSpawner.transform.localScale.x,
             _playerOffset,
             spawnLocation.y * playerSpawner.transform.localScale.z);
+        playerSpawner.transform.parent = EntitiesParent.transform;
 
+        //End of Level
         spawnLocation = FindRandomEntityLocation(3);
         endLevel.transform.position = new Vector3(
             spawnLocation.x * endLevel.transform.localScale.x,
             _endOfLevelOffset,
             spawnLocation.y * endLevel.transform.localScale.z);
+        endLevel.transform.parent = EntitiesParent.transform;
     }
 
+    /// <summary>
+    /// Finds a random entity location based on the minimum and maximum amount 
+    /// of neighbours passed to this method. Neighbours represent the walls of 
+    /// the map.
+    /// </summary>
+    /// <param name="minNeighbours">The minimum amount of neighbours (inclusive)</param>
+    /// <param name="maxNeighbours">The maximum amount of neighbours (inclusive)</param>
+    /// <returns></returns>
     private Vector2Int FindRandomEntityLocation(int minNeighbours = 0, int maxNeighbours = 8)
     {
         Vector2Int location = Vector2Int.zero;
@@ -212,14 +316,15 @@ public class LevelGeneration : MonoBehaviour
             Destroy(transform.GetChild(i).gameObject);
         }
 
-        Destroy(GameObject.FindGameObjectWithTag("PlayerSpawner"));
-        Destroy(GameObject.FindGameObjectWithTag("LevelEnding"));
+        for (int i = 0; i < EntitiesParent.transform.childCount; i++)
+        {
+            Destroy(EntitiesParent.transform.GetChild(i).gameObject);
+        }
     }
-
-#region UtilityMethods
-
+    
     /// <summary>
-    /// Searches in all 8 tiles around the tile at the given position for how many walls there are surrounding the current one.
+    /// Searches in all 8 tiles around the tile at the given position for how 
+    /// many walls there are surrounding the current one.
     /// </summary>
     /// <param name="x"> The x-position to check </param>
     /// <param name="y"> The y-position to check </param>
@@ -250,7 +355,8 @@ public class LevelGeneration : MonoBehaviour
     }
 
     /// <summary>
-    /// Checks whether the given position is outside of the bounds of the play area.
+    /// Checks whether the given position is outside of the bounds of the play 
+    /// area.
     /// </summary>
     /// <param name="x"> The x-position to check </param>
     /// <param name="y"> The y-position to check </param>
@@ -264,7 +370,8 @@ public class LevelGeneration : MonoBehaviour
     }
 
     /// <summary>
-    /// Using this flood filling algorithm we are checking whether every floor tile from the given starting point is reachable.
+    /// Using this flood filling algorithm we are checking whether every floor 
+    /// tile from the given starting point is reachable.
     /// </summary>
     /// <param name="x"> The starting x-position of the algorithm </param>
     /// <param name="y"> The starting y-position of the algorithm </param>
@@ -284,13 +391,13 @@ public class LevelGeneration : MonoBehaviour
         FloodFill(x + 1, y);
     }
 
-#endregion
-
 
 #region Unity Methods
 
     private void Start ()
     {
+        EntitiesParent = new GameObject("_Entities");
+
         GenerateLevel();
 	}
 
