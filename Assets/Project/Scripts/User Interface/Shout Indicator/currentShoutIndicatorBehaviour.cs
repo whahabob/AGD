@@ -9,11 +9,13 @@ public class currentShoutIndicatorBehaviour : MonoBehaviour {
 	// Use this for initialization
 	void Start () {
 		text = GetComponentInChildren<Text> ();
-		shoutScript = GameObject.FindGameObjectWithTag ("Player").GetComponent<playerHandleShouts> ();
 	}
 	
 	// Update is called once per frame
 	void Update () {
+		if (!shoutScript) 
+			shoutScript = GameObject.FindGameObjectWithTag ("Player").GetComponent<playerHandleShouts> ();
+		
 		text.text = shoutScript.shoutName [shoutScript.currentShout];
 	}
 }

@@ -5,7 +5,15 @@ licenseType: Free
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences: []
+  defaultReferences:
+  - _wall: {fileID: 1047942059252450, guid: 599e747df66c9f34bb29f0aeffcb56e3, type: 2}
+  - _floor: {fileID: 1365803679201070, guid: 0e867e4a6aa843b43ace1673768bb2be, type: 2}
+  - _playerSpawner: {fileID: 1643860215833744, guid: d8458f272a76a56479da267314e6c76d,
+      type: 2}
+  - _enemySpawner: {fileID: 1333993304661606, guid: a1ee55a8d89a1a44abcd3ca16b04118c,
+      type: 2}
+  - _endOfLevel: {fileID: 1669613235380570, guid: e1de3a266aa49664c93852b6f445f031,
+      type: 2}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

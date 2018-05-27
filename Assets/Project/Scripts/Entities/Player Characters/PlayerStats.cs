@@ -34,6 +34,11 @@ public class PlayerStats : MonoBehaviour {
 		shoutScript = GameObject.FindGameObjectWithTag ("Player").GetComponent<playerHandleShouts> ();
 		uiFadeScript = GameObject.FindGameObjectWithTag("UI").GetComponent<UiFadeScript> ();
 
+		breathBar = GameObject.Find ("BreathBar");
+		sanityBar = GameObject.Find ("SanityBar");
+		rationalityBar = GameObject.Find ("RationalityBar");
+		scoreDisplayer = GameObject.Find ("ScoreNumber").GetComponent<Text> ();
+
 		//Flashlight battery init
 		InvokeRepeating ("DrainBattery", 1, 1);
 		flashlight = GetComponentInChildren<Light> ();

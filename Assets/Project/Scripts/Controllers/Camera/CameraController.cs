@@ -22,6 +22,9 @@ public class CameraController : MonoBehaviour
 
     void Update()
     {
+        if (!target)
+            target = GameObject.FindGameObjectWithTag("Player").transform;
+
 		Vector3 goalPos = target.position + new Vector3(xOffset, yOffset, zOffset); goalPos.y = transform.position.y;
 		Vector3 newPos = Vector3.SmoothDamp(transform.position, goalPos, ref velocity, smoothTime);
 

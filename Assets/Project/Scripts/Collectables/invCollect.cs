@@ -12,7 +12,7 @@ public class invCollect : MonoBehaviour {
 
     // Use this for initialization
     void Start () {
-	
+		inventoryPanel = GameObject.Find ("Inventory");
 	}
 	
 	// Update is called once per frame
