@@ -4,8 +4,6 @@ using UnityEngine;
 
 public class LevelGeneration : MonoBehaviour
 {
-    private const bool DEBUG_MODE = true;
-
     [Header("Initial Map Values")]
     [SerializeField] private int _mapWidth;
     [SerializeField] private int _mapHeight;
@@ -17,8 +15,8 @@ public class LevelGeneration : MonoBehaviour
     [SerializeField] [Range(0, 5)] private int _starvationLimit;
 
     [Header("Level Generation - Entities")]
-    [SerializeField] private float _minimumLengthBetweenSpawnAndEnd;
-    [SerializeField] private float _minimumLengthBetweenEnemies;
+    [SerializeField] private float _minLengthSpawnEnd;
+    [SerializeField] private float _minLengthEnemies;
     [SerializeField] [Range(0, 10)] private int _amountOfEnemies;
 
     [Header("Level Confirmation")]
@@ -42,6 +40,16 @@ public class LevelGeneration : MonoBehaviour
     [SerializeField] private float _playerOffset;
     [SerializeField] private float _enemySpawnerOffset;
     [SerializeField] private float _endOfLevelOffset;
+
+    private const bool DEBUG_MODE = true;
+       
+    //also use player spawn min/max for the end of the level
+    private const int MIN_NEIGHBOURS_PLAYER_SPAWN = 3;
+    private const int MAX_NEIGHBOURS_PLAYER_SPAWN = 8;
+    private const int MIN_NEIGHBOURS_ENEMY_SPAWN = 0;
+    private const int MAX_NEIGHBOURS_ENEMY_SPAWN = 8;
+    private const int MIN_NEIGHBOURS_PICKUP_SPAWN = 4;
+    private const int MAX_NEIGHBOURS_PICKUP_SPAWN = 6;
 
     private GameObject EntitiesParent { get; set; }
     private int[,] Map { get; set; }
@@ -189,7 +197,7 @@ public class LevelGeneration : MonoBehaviour
         GameObject playerSpawner = Instantiate(_playerSpawner);
         GameObject endLevel = Instantiate(_endOfLevel);
 
-        while (lengthSpawnToEnd < _minimumLengthBetweenSpawnAndEnd)
+        while (lengthSpawnToEnd < _minLengthSpawnEnd)
         {
             InitializeSpawnAndEndLocation(ref playerSpawner, ref endLevel);
             lengthSpawnToEnd = Vector3.Distance(
@@ -216,9 +224,9 @@ public class LevelGeneration : MonoBehaviour
         int tries = 0;
         while (tries < maxTries)
         {
-            spawnLocation = FindRandomEntityLocation();
+            spawnLocation = FindRandomEntityLocation(MIN_NEIGHBOURS_ENEMY_SPAWN, MAX_NEIGHBOURS_ENEMY_SPAWN);
 
-            if (Vector2Int.Distance(playerLocation, spawnLocation) > _minimumLengthBetweenEnemies)
+            if (Vector2Int.Distance(playerLocation, spawnLocation) > _minLengthEnemies)
             {
                 int tempTries = tries;
                 tries = maxTries;
@@ -231,7 +239,7 @@ public class LevelGeneration : MonoBehaviour
                             (int)(enemies[i].transform.position.x / enemies[i].transform.localScale.x),
                             (int)(enemies[i].transform.position.z / enemies[i].transform.localScale.z));
 
-                        if (Vector2Int.Distance(enemyLocation, spawnLocation) < _minimumLengthBetweenEnemies)
+                        if (Vector2Int.Distance(enemyLocation, spawnLocation) < _minLengthEnemies)
                         {
                             tries = tempTries;
                         }
@@ -245,7 +253,7 @@ public class LevelGeneration : MonoBehaviour
         //Even if we failed to get a good distance between other enemies, 
         //at least make sure the distance from the player is bigger than the
         //minimum to avoid getting attacked while spawning in.
-        if (Vector2Int.Distance(playerLocation, spawnLocation) > _minimumLengthBetweenEnemies)
+        if (Vector2Int.Distance(playerLocation, spawnLocation) > _minLengthEnemies)
         {
             GameObject enemy = Instantiate(_enemySpawner);
             enemy.transform.position = new Vector3(
@@ -265,7 +273,7 @@ public class LevelGeneration : MonoBehaviour
     private void InitializeSpawnAndEndLocation(ref GameObject playerSpawner, ref GameObject endLevel)
     {
         //Player Spawner 
-        Vector2Int spawnLocation = FindRandomEntityLocation(3);
+        Vector2Int spawnLocation = FindRandomEntityLocation(MIN_NEIGHBOURS_PLAYER_SPAWN, MAX_NEIGHBOURS_PLAYER_SPAWN);
         playerSpawner.transform.position = new Vector3(
             spawnLocation.x * playerSpawner.transform.localScale.x,
             _playerOffset,
@@ -273,7 +281,7 @@ public class LevelGeneration : MonoBehaviour
         playerSpawner.transform.parent = EntitiesParent.transform;
 
         //End of Level
-        spawnLocation = FindRandomEntityLocation(3);
+        spawnLocation = FindRandomEntityLocation(MIN_NEIGHBOURS_PLAYER_SPAWN, MAX_NEIGHBOURS_PLAYER_SPAWN);
         endLevel.transform.position = new Vector3(
             spawnLocation.x * endLevel.transform.localScale.x,
             _endOfLevelOffset,
