@@ -46,6 +46,7 @@ public class LevelGeneration : MonoBehaviour
     [SerializeField] private float _coinOffset;
     [SerializeField] private float _batteryOffset;
 
+    private List<Vector2Int> _usedPickUpLocations = new List<Vector2Int>();
     private const bool DEBUG_MODE = true;
        
     //also use player spawn min/max for the end of the level
@@ -213,7 +214,7 @@ public class LevelGeneration : MonoBehaviour
 
         for (int i = 0; i < _amountOfEnemies; i++)
         {
-            SpawnEnemy(ref playerSpawner, 999);
+            SpawnEnemy(ref playerSpawner, 9999);
         }
 
         AddPickupSpawns(_coin, _amountOfCoins, 9999);
@@ -300,8 +301,12 @@ public class LevelGeneration : MonoBehaviour
         endLevel.transform.parent = EntitiesParent.transform;
     }
 
-    List<Vector2Int> _usedPickUpLocations = new List<Vector2Int>();
-
+    /// <summary>
+    /// Spawns pickup location using the MIN_NEIGHBOURS_PICKUP_SPAWN and MAX_NEIGHBOURS_PICKUP_SPAWN as references to where they have to spawn
+    /// </summary>
+    /// <param name="go">The Pickup to spawn</param>
+    /// <param name="amount">The amount of pickups of this type that have to spawn</param>
+    /// <param name="maxTries">The maximum amount of tries to find a good spawning location</param>
     private void AddPickupSpawns(GameObject go, int amount, int maxTries)
     {
         Vector2Int location = Vector2Int.zero;
@@ -461,7 +466,7 @@ public class LevelGeneration : MonoBehaviour
     private void Start ()
     {
         EntitiesParent = new GameObject("_Entities");
-
+        NavMeshDirty = true;
         GenerateLevel();
 	}
 

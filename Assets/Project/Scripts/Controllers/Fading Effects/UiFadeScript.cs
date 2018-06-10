@@ -49,6 +49,7 @@ public class UiFadeScript : MonoBehaviour {
 				switch (transitionType) {
 
 				case "Brain":
+                    SceneManager.LoadScene("StatsTransition");
                        // SceneManager.LoadScene("LevelGeneration");
                     //SceneManager.LoadScene ("StatsTransition");
 					break;
