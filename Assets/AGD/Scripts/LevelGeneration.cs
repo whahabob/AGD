@@ -21,7 +21,9 @@ public class LevelGeneration : MonoBehaviour
     [SerializeField] private float _minLengthSpawnEnd;
     [SerializeField] private float _minLengthEnemies;
     [SerializeField] [Range(0, 10)] private int _amountOfEnemies;
-
+    [SerializeField] [Range(10, 50)] private int _amountOfCoins;
+    [SerializeField] [Range(0, 10)] private int _amountOfBatteries; 
+    
     [Header("Level Creation - Prefabs")]
     [SerializeField] private GameObject _wall;
     [SerializeField] private GameObject _floor;
@@ -35,12 +37,14 @@ public class LevelGeneration : MonoBehaviour
     [SerializeField] private GameObject _enemySpawner;
     [SerializeField] private GameObject _endOfLevel;
     [SerializeField] private GameObject _coin;
+    [SerializeField] private GameObject _battery;
 
     [Header("Entity Spawning - Y Offsets")]
     [SerializeField] private float _playerOffset;
     [SerializeField] private float _enemySpawnerOffset;
     [SerializeField] private float _endOfLevelOffset;
     [SerializeField] private float _coinOffset;
+    [SerializeField] private float _batteryOffset;
 
     private const bool DEBUG_MODE = true;
        
@@ -209,10 +213,11 @@ public class LevelGeneration : MonoBehaviour
 
         for (int i = 0; i < _amountOfEnemies; i++)
         {
-            SpawnEnemy(ref playerSpawner, 99);
+            SpawnEnemy(ref playerSpawner, 999);
         }
 
-        AddCoinSpawns(20);
+        AddPickupSpawns(_coin, _amountOfCoins, 9999);
+        AddPickupSpawns(_battery, _amountOfBatteries, 9999);
 
         NavMeshDirty = true;
     }
@@ -295,41 +300,49 @@ public class LevelGeneration : MonoBehaviour
         endLevel.transform.parent = EntitiesParent.transform;
     }
 
-    private void AddCoinSpawns(int amount)
+    List<Vector2Int> _usedPickUpLocations = new List<Vector2Int>();
+
+    private void AddPickupSpawns(GameObject go, int amount, int maxTries)
     {
-        List<Vector2Int> usedLocations = new List<Vector2Int>();
         Vector2Int location = Vector2Int.zero;
         bool locationFound;
+        int tries = 0;
 
         for (int i = 0; i < amount; i++)
         {
             locationFound = false;
-            while (!locationFound)
+            while (!locationFound && tries < maxTries) 
             {
                 location = FindRandomEntityLocation(MIN_NEIGHBOURS_PICKUP_SPAWN, MAX_NEIGHBOURS_PICKUP_SPAWN);
-                if (usedLocations.Count == 0)
+                if (_usedPickUpLocations.Count == 0)
                 {
                     locationFound = true;
-                    usedLocations.Add(location);
+                    _usedPickUpLocations.Add(location);
                 }
 
-                for (int j = 0; j < usedLocations.Count; j++)
+                for (int j = 0; j < _usedPickUpLocations.Count; j++)
                 {
-                    if (location != usedLocations[j])
+                    if (location != _usedPickUpLocations[j])
                     {
                         locationFound = true;
-                        usedLocations.Add(location);
+                        _usedPickUpLocations.Add(location);
                         break;
                     }
                 }
+
+                tries++;
             }
 
-            Transform t = Instantiate(_coin).transform;
-            t.position = new Vector3(
-                location.x * _coin.transform.localScale.x,
-                _coinOffset,
-                location.y * _coin.transform.localScale.z);
-            t.parent = EntitiesParent.transform;
+            if (locationFound)
+            {
+                Transform t = Instantiate(go).transform;
+                t.position = new Vector3(
+                    location.x * _coin.transform.localScale.x,
+                    _coinOffset,
+                    location.y * _coin.transform.localScale.z);
+                t.parent = EntitiesParent.transform;
+            }
+            else { Debug.Log("No Location found"); }
         }
     }
 
