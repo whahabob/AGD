@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
 public class LevelGeneration : MonoBehaviour
 {
@@ -13,21 +14,19 @@ public class LevelGeneration : MonoBehaviour
     [SerializeField] [Range(0, 10)] private int _simulationSteps;
     [SerializeField] [Range(0, 5)] private int _birthLimit;
     [SerializeField] [Range(0, 5)] private int _starvationLimit;
+    [Tooltip("Amount of fill required for the level to be considered \"Worthy\" to use.")]
+    [SerializeField] [Range(0, 0.75f)] private float _minimumFillPercentage;
 
     [Header("Level Generation - Entities")]
     [SerializeField] private float _minLengthSpawnEnd;
     [SerializeField] private float _minLengthEnemies;
     [SerializeField] [Range(0, 10)] private int _amountOfEnemies;
 
-    [Header("Level Confirmation")]
-    [Tooltip("Amount of fill required for the level to be considered \"Worthy\" to use.")]
-    [SerializeField] [Range(0, 1)] private float _minimumFillPercentage;
-
     [Header("Level Creation - Prefabs")]
     [SerializeField] private GameObject _wall;
     [SerializeField] private GameObject _floor;
 
-    [Header("Level Creation - Offsets")]
+    [Header("Level Creation - Y Offsets")]
     [SerializeField] private float _wallOffset;
     [SerializeField] private float _floorOffset;
 
@@ -35,11 +34,13 @@ public class LevelGeneration : MonoBehaviour
     [SerializeField] private GameObject _playerSpawner;
     [SerializeField] private GameObject _enemySpawner;
     [SerializeField] private GameObject _endOfLevel;
+    [SerializeField] private GameObject _coin;
 
-    [Header("Entity Spawning - Offsets")]
+    [Header("Entity Spawning - Y Offsets")]
     [SerializeField] private float _playerOffset;
     [SerializeField] private float _enemySpawnerOffset;
     [SerializeField] private float _endOfLevelOffset;
+    [SerializeField] private float _coinOffset;
 
     private const bool DEBUG_MODE = true;
        
@@ -54,6 +55,7 @@ public class LevelGeneration : MonoBehaviour
     private GameObject EntitiesParent { get; set; }
     private int[,] Map { get; set; }
     private bool[,] Visited { get; set; }
+    private bool NavMeshDirty { get; set; }
 
     /// <summary>
     /// Initializes the base of the map. Meaning a completely random map, with
@@ -209,6 +211,10 @@ public class LevelGeneration : MonoBehaviour
         {
             SpawnEnemy(ref playerSpawner, 99);
         }
+
+        AddCoinSpawns(20);
+
+        NavMeshDirty = true;
     }
 
     //TODO: Actually fucking comment this. :)
@@ -287,6 +293,44 @@ public class LevelGeneration : MonoBehaviour
             _endOfLevelOffset,
             spawnLocation.y * endLevel.transform.localScale.z);
         endLevel.transform.parent = EntitiesParent.transform;
+    }
+
+    private void AddCoinSpawns(int amount)
+    {
+        List<Vector2Int> usedLocations = new List<Vector2Int>();
+        Vector2Int location = Vector2Int.zero;
+        bool locationFound;
+
+        for (int i = 0; i < amount; i++)
+        {
+            locationFound = false;
+            while (!locationFound)
+            {
+                location = FindRandomEntityLocation(MIN_NEIGHBOURS_PICKUP_SPAWN, MAX_NEIGHBOURS_PICKUP_SPAWN);
+                if (usedLocations.Count == 0)
+                {
+                    locationFound = true;
+                    usedLocations.Add(location);
+                }
+
+                for (int j = 0; j < usedLocations.Count; j++)
+                {
+                    if (location != usedLocations[j])
+                    {
+                        locationFound = true;
+                        usedLocations.Add(location);
+                        break;
+                    }
+                }
+            }
+
+            Transform t = Instantiate(_coin).transform;
+            t.position = new Vector3(
+                location.x * _coin.transform.localScale.x,
+                _coinOffset,
+                location.y * _coin.transform.localScale.z);
+            t.parent = EntitiesParent.transform;
+        }
     }
 
     /// <summary>
@@ -399,7 +443,6 @@ public class LevelGeneration : MonoBehaviour
         FloodFill(x + 1, y);
     }
 
-
 #region Unity Methods
 
     private void Start ()
@@ -411,6 +454,12 @@ public class LevelGeneration : MonoBehaviour
 
     private void Update()
     {
+        if (NavMeshDirty)
+        {
+            GetComponent<NavMeshSurface>().BuildNavMesh();
+            NavMeshDirty = false;
+        }
+
         if (Input.GetKeyDown(KeyCode.R))
             GenerateLevel();
     }
