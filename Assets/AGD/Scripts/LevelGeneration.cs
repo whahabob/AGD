@@ -8,6 +8,7 @@ public class LevelGeneration : MonoBehaviour
     [SerializeField] private int _mapWidth;
     [SerializeField] private int _mapHeight;
     [SerializeField][Range(0, 1)] private float _wallPercentage;
+    [SerializeField] private int MAX_LEAF_SIZE = 20;
 
     [Header("Level Generation")]
     [SerializeField] [Range(0, 10)] private int _simulationSteps;
@@ -63,12 +64,14 @@ public class LevelGeneration : MonoBehaviour
     /// </summary>
     private void InitializeMap()
     {
-        Map = new int[_mapWidth, _mapHeight];
-        Visited = new bool[_mapWidth, _mapHeight];
+        Map = new int[0,0];
+       
+       createRooms();
+       // Visited = new bool[_mapWidth, _mapHeight];
 
-        int middle = _mapHeight / 2;
+        //int middle = _mapHeight / 2;
 
-        for (int x = 0; x < _mapWidth; x++)
+       /*  for (int x = 0; x < _mapWidth; x++)
         {
             for (int y = 0; y < _mapHeight; y++)
             {
@@ -76,10 +79,44 @@ public class LevelGeneration : MonoBehaviour
                 else if (y == 0) Map[x, y] = 1;
                 else if (x == _mapWidth - 1) Map[x, y] = 1;
                 else if (y == _mapHeight - 1) Map[x, y] = 1;
-                else Map[x, y] = y == middle ? 0 : Random.value < _wallPercentage ? 1 : 0;
+                
+            }
+        } */
+    }
+
+    private void createRooms()
+    {
+        List<Leaf> _leafs = new List<Leaf>();
+
+        Leaf root = new Leaf(0,0,MAX_LEAF_SIZE,MAX_LEAF_SIZE,_wall,_floor);
+        Map = mergeMap(Map,root.Map);
+        _leafs.Add(root);
+
+        bool did_split = true;
+        Leaf leaf;
+
+        while(did_split)
+        {
+            did_split = false;
+            
+            for(int i = 0; i <_leafs.Count; i++)
+            {
+                leaf = _leafs[i];
+                if(leaf.leftChild == null && leaf.rightChild == null)
+                {
+                    if(leaf.width > MAX_LEAF_SIZE || leaf.height > MAX_LEAF_SIZE)
+                        if(leaf.split())
+                        {
+                            Map = mergeMap(Map, leaf.leftChild.Map);
+                            Map = mergeMap(Map, leaf.rightChild.Map);
+                            did_split = true;
+                        }
+                }
             }
         }
     }
+
+    
 
     /// <summary>
     /// Change the map based on the amount of neighbours each node has. 
@@ -405,14 +442,36 @@ public class LevelGeneration : MonoBehaviour
     private void Start ()
     {
         EntitiesParent = new GameObject("_Entities");
-
-        GenerateLevel();
+        InitializeMap();
+        //GenerateLevel();
 	}
 
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.R))
             GenerateLevel();
+    }
+
+    public int[,] mergeMap(int [,] map1, int [,] map2)
+    {
+        int [,] newMap = new int[map1.GetLength(0)+map2.GetLength(0),map1.GetLength(1)+map2.GetLength(1)];
+
+        
+        for (int i = 0; i < map1.GetLength(0); i++)
+        {
+            for (int j = 0; j < map1.GetLength(1); j++)
+            {
+                newMap[i, j] = map1[i, j];
+            }
+        }                
+        for (int i = 0; i < map1.GetLength(0); i++)
+        {
+            for (int y = 0; y < map2.GetLength(1); y++)
+            {
+                newMap[i, y+map1.GetLength(1)] = map2[i, y];
+            }
+        }
+        return newMap;
     }
     
 #endregion
