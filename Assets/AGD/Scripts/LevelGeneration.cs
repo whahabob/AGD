@@ -5,15 +5,17 @@ using UnityEngine;
 public class LevelGeneration : MonoBehaviour
 {
     [Header("Initial Map Values")]
-    [SerializeField] private int _mapWidth;
-    [SerializeField] private int _mapHeight;
+    [SerializeField] private int levelWidth;
+    [SerializeField] private int levelHeight;
+   // [SerializeField] private int Map.GetLength(0);
+   // [SerializeField] private int Map.GetLength(1);
     [SerializeField][Range(0, 1)] private float _wallPercentage;
-    [SerializeField] private int MAX_LEAF_SIZE = 20;
+    [SerializeField] private int MAX_LEAF_SIZE = 40;
 
     [Header("Level Generation")]
     [SerializeField] [Range(0, 10)] private int _simulationSteps;
-    [SerializeField] [Range(0, 5)] private int _birthLimit;
-    [SerializeField] [Range(0, 5)] private int _starvationLimit;
+    [SerializeField] [Range(0, 9)] private int _birthLimit;
+    [SerializeField] [Range(0, 9)] private int _starvationLimit;
 
     [Header("Level Generation - Entities")]
     [SerializeField] private float _minLengthSpawnEnd;
@@ -64,21 +66,67 @@ public class LevelGeneration : MonoBehaviour
     /// </summary>
     private void InitializeMap()
     {
-        Map = new int[0,0];
-       
-       createRooms();
-       // Visited = new bool[_mapWidth, _mapHeight];
-
-        //int middle = _mapHeight / 2;
-
-       /*  for (int x = 0; x < _mapWidth; x++)
+        Map = new int[levelWidth,levelHeight];
+        Visited = new bool[levelWidth,levelHeight];
+        for(int i = 0; i < levelWidth;i++)
         {
-            for (int y = 0; y < _mapHeight; y++)
+            for(int j = 0; j <levelHeight;j++)
+            {
+                Map[i, j] = 2;
+            }
+        }
+       createRooms();
+       ClearLevel2();
+
+       for (int i = 0; i < _simulationSteps; i++)
+            DoSimulationStep();
+
+        FixLevelGaps();
+
+        if (FindLevelSize() < _minimumFillPercentage)
+        {
+            ClearLevel();
+            InitializeMap();
+            return;
+        }
+
+        for (int xx = 0; xx < Map.GetLength(0); xx++)
+        {
+            for (int yy = 0; yy < Map.GetLength(1); yy++)
+            {
+                if(Map[xx, yy] == 1)
+                {
+                    GameObject go = Instantiate(_wall);
+                go.transform.position = new Vector3(
+                    xx * go.transform.localScale.x, 
+                    Map[xx, yy] == 1 ? _wallOffset : _floorOffset, 
+                    yy * go.transform.localScale.z);
+                go.transform.parent = transform;
+                }
+                if(Map[xx,yy] == 0)
+                {
+                     GameObject go = Instantiate(_floor);
+                    go.transform.position = new Vector3(
+                        xx * go.transform.localScale.x, 
+                        Map[xx, yy] == 1 ? _wallOffset : _floorOffset, 
+                        yy * go.transform.localScale.z);
+                    go.transform.parent = transform;
+                }
+               
+            }
+        }
+       // Visited = new bool[Map.GetLength(0), Map.GetLength(1)];
+
+        //int middle = Map.GetLength(1) / 2;
+
+       /*  for (int x = 0; x < Map.GetLength(0); x++)
+        {
+            for (int y = 0; y < Map.GetLength(1); y++)
             {
                 if (x == 0) Map[x, y] = 1;
                 else if (y == 0) Map[x, y] = 1;
-                else if (x == _mapWidth - 1) Map[x, y] = 1;
-                else if (y == _mapHeight - 1) Map[x, y] = 1;
+                else if (x == Map.GetLength(0) - 1) Map[x, y] = 1;
+                else if (y == Map.GetLength(1) - 1) Map[x, y] = 1;
                 
             }
         } */
@@ -89,31 +137,63 @@ public class LevelGeneration : MonoBehaviour
         List<Leaf> _leafs = new List<Leaf>();
 
         Leaf root = new Leaf(0,0,MAX_LEAF_SIZE,MAX_LEAF_SIZE,_wall,_floor);
-        Map = mergeMap(Map,root.Map);
+        //Leaf root1 = new Leaf(40,40,MAX_LEAF_SIZE*2,MAX_LEAF_SIZE*2,_wall,_floor);
+        // Leaf root2 = new Leaf(20,200,MAX_LEAF_SIZE/2,MAX_LEAF_SIZE/2,_wall,_floor);
+        
+        //Map = mergeMap(Map,root.Map,1 ,1);
         _leafs.Add(root);
+       //_leafs.Add(root1);
+       // _leafs.Add(root2);
+       
+       // levelWidth -= root1.width;
+      //  levelHeight -= root1.height;
+       // levelWidth -= root2.width;
+       // levelHeight -= root2.height;
 
         bool did_split = true;
         Leaf leaf;
 
-        while(did_split)
+       while(did_split)
         {
             did_split = false;
-            
             for(int i = 0; i <_leafs.Count; i++)
             {
+               
                 leaf = _leafs[i];
-                if(leaf.leftChild == null && leaf.rightChild == null)
+                Debug.Log(i + " pos "+ leaf.x + ":" + leaf.y + " "+ leaf.width + ":" + leaf.height );
+                 
+                levelWidth -= leaf.width;
+                levelHeight -= leaf.height;
+                
+                for(int j = leaf.x; j < leaf.x+leaf.width; j++)
                 {
-                    if(leaf.width > MAX_LEAF_SIZE || leaf.height > MAX_LEAF_SIZE)
-                        if(leaf.split())
-                        {
-                            Map = mergeMap(Map, leaf.leftChild.Map);
-                            Map = mergeMap(Map, leaf.rightChild.Map);
-                            did_split = true;
-                        }
+                    
+                    for(int u = leaf.y  ; u < leaf.y+leaf.height; u++)
+                    {
+                        Map[j,u] = leaf.Map[j-leaf.x,u-leaf.y];
+                    }
                 }
+                
+                
+                 if(leaf.leftChild == null && leaf.rightChild == null)
+                    {
+                       
+                        if((leaf.x + leaf.width) + MAX_LEAF_SIZE< levelWidth && (leaf.y + leaf.height) + MAX_LEAF_SIZE <levelHeight)
+                        {
+                       
+                        if(leaf.split(leaf.x + leaf.width,leaf.y + leaf.height))
+                            {
+                                _leafs.Add(leaf.leftChild);
+                                _leafs.Add(leaf.rightChild);
+                                did_split = true;
+                            } 
+
+                        }
+                            
+                    }
             }
         }
+        
     }
 
     
@@ -123,19 +203,27 @@ public class LevelGeneration : MonoBehaviour
     /// </summary>
     private void DoSimulationStep()
     {
-        int[,] newMap = new int[_mapWidth, _mapHeight];
+        int[,] newMap = new int[Map.GetLength(0), Map.GetLength(1)];
 
-        for (int x = 0; x < _mapWidth; x++)
+        for (int x = 0; x < Map.GetLength(0); x++)
         {
-            for (int y = 0; y < _mapHeight; y++)
+            for (int y = 0; y < Map.GetLength(1); y++)
             {
                 int neighbourCount = GetAliveNeighbourCount(x, y);
 
-                if (Map[x, y] == 1)
-                    newMap[x, y] = neighbourCount < _starvationLimit ? 0 : 1;
+                
 
+                if(Map[x, y] == 2)
+                    newMap[x, y] = 2;
+                else if (Map[x, y] == 1)
+                    newMap[x, y] = neighbourCount < _starvationLimit ? 0 : 1;
                 else if (Map[x, y] == 0)
                     newMap[x, y] = neighbourCount > _birthLimit ? 1 : 0;
+                else if (neighbourCount ==  _starvationLimit)
+                    newMap[x, y] = 0;
+
+                if(isNearEdgde(x,y) && Map[x,y] != 2)
+                    newMap[x, y] = 1;
             }
         }
 
@@ -152,9 +240,14 @@ public class LevelGeneration : MonoBehaviour
     {
         //Initialize the visited 2d array, to make sure the walls are already
         //visited.
-        for (int xi = 0; xi < _mapWidth; xi++)
-            for (int yi = 0; yi < _mapHeight; yi++)
-                Visited[xi, yi] = Map[xi, yi] == 1 ? true : false;
+        for (int xi = 0; xi < Map.GetLength(0); xi++)
+            for (int yi = 0; yi < Map.GetLength(1); yi++)
+            {
+                if(Map[xi, yi] == 1 || Map[xi, yi] == 2 )
+                Visited[xi, yi] = true;
+               
+            }
+                
 
         int tileType = 1;
         Vector2Int tilePosition = Vector2Int.zero;
@@ -165,17 +258,18 @@ public class LevelGeneration : MonoBehaviour
         while (tileType != 0)
         {
             tilePosition = new Vector2Int(
-                Random.Range(0, _mapWidth), 
-                Random.Range(0, _mapHeight));
+                Random.Range(0, Map.GetLength(0)), 
+                Random.Range(0, Map.GetLength(1)));
+                if(Map[tilePosition.x, tilePosition.y] != 2)
             tileType = Map[tilePosition.x, tilePosition.y];
         }
 
         //Call the flood fill algorithm from a random position.
         FloodFill(tilePosition.x, tilePosition.y);
 
-        for (int x = 0; x < _mapWidth; x++)
-            for (int y = 0; y < _mapHeight; y++)
-                if (!Visited[x, y]) Map[x, y] = 1;
+        for (int x = 0; x < Map.GetLength(0); x++)
+            for (int y = 0; y < Map.GetLength(1); y++)
+                if (!Visited[x, y] && Map[x,y] != 2) Map[x, y] = 1;
     }
 
     /// <summary>
@@ -186,11 +280,11 @@ public class LevelGeneration : MonoBehaviour
     /// to the full map </returns>
     private float FindLevelSize()
     {
-        int totalSize = _mapWidth * _mapHeight;
+        int totalSize = Map.GetLength(0) * Map.GetLength(1);
         int currentSize = 0;
 
-        for (int x = 0; x < _mapWidth; x++)
-            for (int y = 0; y < _mapHeight; y++)
+        for (int x = 0; x < Map.GetLength(0); x++)
+            for (int y = 0; y < Map.GetLength(1); y++)
                 currentSize += Map[x, y] == 0 ? 1 : 0;
 
         return (float)currentSize / totalSize;
@@ -217,9 +311,9 @@ public class LevelGeneration : MonoBehaviour
         //Clear the level in case there is already one generated.
         ClearLevel();
 
-        for (int x = 0; x < _mapWidth; x++)
+        for (int x = 0; x < Map.GetLength(0); x++)
         {
-            for (int y = 0; y < _mapHeight; y++)
+            for (int y = 0; y < Map.GetLength(1); y++)
             {
                 GameObject go = Instantiate(Map[x, y] == 1 ? _wall : _floor);
                 go.transform.position = new Vector3(
@@ -341,7 +435,7 @@ public class LevelGeneration : MonoBehaviour
 
         while (!foundLocation)
         {
-            location = new Vector2Int(Random.Range(0, _mapWidth), Random.Range(0, _mapHeight));
+            location = new Vector2Int(Random.Range(0, Map.GetLength(0)), Random.Range(0, Map.GetLength(1)));
             if (Map[location.x, location.y] == 0)
                 if (GetAliveNeighbourCount(location.x, location.y) >= minNeighbours &&
                     GetAliveNeighbourCount(location.x, location.y) <= maxNeighbours)
@@ -351,11 +445,10 @@ public class LevelGeneration : MonoBehaviour
         return location;
     }
 
-    /// <summary>
-    /// Clear all GameObjects that are currently used for the level.
-    /// </summary>
+
     private void ClearLevel()
     {
+
         for (int i = 0; i < transform.childCount; i++)
         {
             Destroy(transform.GetChild(i).gameObject);
@@ -365,6 +458,56 @@ public class LevelGeneration : MonoBehaviour
         {
             Destroy(EntitiesParent.transform.GetChild(i).gameObject);
         }
+
+    }
+    /// <summary>
+    /// Clear all GameObjects that are currently used for the level.
+    /// </summary>
+    private void ClearLevel2()
+    {
+
+        int[,] newMap = new int[Map.GetLength(0), Map.GetLength(1)];
+
+        for (int x = 0; x < Map.GetLength(0); x++)
+        {
+            for (int y = 0; y < Map.GetLength(1); y++)
+            {
+                if(Map[x, y] == 2)
+                    newMap[x, y] = 2;
+
+                if(isNearEdgde(x,y) && Map[x,y] != 2)
+                    newMap[x, y] = 1;
+               if (Map[x, y] == 1)
+                    newMap[x, y] = 0;
+            }
+        }
+
+        for (int x = 0; x < Map.GetLength(0); x++)
+        {
+            for (int y = 0; y < Map.GetLength(1); y++)
+            {
+                if ( newMap[x, y] == 0) 
+                { 
+                    newMap[x, y] = Random.value < _wallPercentage ? 1 : 0;    
+                }
+            }
+        }
+
+        
+
+        Map = newMap;
+
+
+        /* 
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            Destroy(transform.GetChild(i).gameObject);
+        }
+
+        for (int i = 0; i < EntitiesParent.transform.childCount; i++)
+        {
+            Destroy(EntitiesParent.transform.GetChild(i).gameObject);
+        } */
     }
     
     /// <summary>
@@ -399,6 +542,36 @@ public class LevelGeneration : MonoBehaviour
         return count;
     }
 
+
+    private bool isNearEdgde(int x, int y)
+    {
+        int count = 0;
+
+        for (int i = -1; i < 2; i++)
+        {
+            for (int j = -1; j < 2; j++)
+            {
+                int neighbourX = x + i;
+                int neighbourY = y + j;
+
+                if (!(i == 0 && j == 0))
+                {
+                    if (IsOutOfBounds(neighbourX, neighbourY))
+                        count++;
+
+                    else if (Map[neighbourX, neighbourY] == 2)
+                        count++;
+                }
+            }
+        }
+
+        if(count >= 1 && count <= 9)
+            return true;
+
+        return false;
+
+    }
+
     /// <summary>
     /// Checks whether the given position is outside of the bounds of the play 
     /// area.
@@ -408,7 +581,7 @@ public class LevelGeneration : MonoBehaviour
     /// <returns> Whether the given position is inside the play area. </returns>
     private bool IsOutOfBounds(int x, int y)
     {
-        if (x < 0 || y < 0 || x >= _mapWidth || y >= _mapHeight)
+        if (x < 0 || y < 0 || x >= Map.GetLength(0) || y >= Map.GetLength(1) || Map[x,y] == 2)
             return true;
 
         return false;
@@ -449,10 +622,14 @@ public class LevelGeneration : MonoBehaviour
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.R))
-            GenerateLevel();
+        {
+        
+            InitializeMap();
+        }
+           
     }
 
-    public int[,] mergeMap(int [,] map1, int [,] map2)
+    public int[,] mergeMap(int [,] map1, int [,] map2, int xPos, int yPos)
     {
         int [,] newMap = new int[map1.GetLength(0)+map2.GetLength(0),map1.GetLength(1)+map2.GetLength(1)];
 
@@ -461,14 +638,16 @@ public class LevelGeneration : MonoBehaviour
         {
             for (int j = 0; j < map1.GetLength(1); j++)
             {
-                newMap[i, j] = map1[i, j];
+                newMap[i, j] =  map1[i, j];
             }
         }                
-        for (int i = 0; i < map1.GetLength(0); i++)
+        for (int i = 0; i < map2.GetLength(0); i++)
         {
-            for (int y = 0; y < map2.GetLength(1); y++)
+            for (int yy = 0; yy < map2.GetLength(1); yy++)
             {
-                newMap[i, y+map1.GetLength(1)] = map2[i, y];
+                Debug.Log("Xpos" + xPos + "i " + i);
+                newMap[map1.GetLength(0) + i ,map1.GetLength(1) + yy] = map2[i, yy];
+                
             }
         }
         return newMap;
