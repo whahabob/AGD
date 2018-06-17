@@ -94,22 +94,22 @@ public class Leaf : MonoBehaviour
 
             if(splitH)
             {
-                leftChild = new Leaf(xx+_roomSpacePercentage+ split, yy+_roomSpacePercentage+ split, 
+                leftChild = new Leaf(xx+_roomSpacePercentage+ split, yy/2+_roomSpacePercentage+ split, 
                                     width, height+ split,_wall, _floor);
                     split2 = (Random.Range(MIN_LEAF_SIZE, max))/6;
                    r = Random.Range(1,3);
                    split = split2*r;
-                rightChild = new Leaf(xx+_roomSpacePercentage+ split, yy+_roomSpacePercentage  + split, 
+                rightChild = new Leaf(xx+_roomSpacePercentage+ split, yy/2+_roomSpacePercentage  + split, 
                                     width, height - split,_wall, _floor);
             }
             else
             {
-                leftChild = new Leaf(xx+_roomSpacePercentage+ split,  yy+_roomSpacePercentage+ split,  
+                leftChild = new Leaf(xx+_roomSpacePercentage+ split,  yy/2+_roomSpacePercentage+ split,  
                                     width+split, height,_wall, _floor);
                     split2 = (Random.Range(MIN_LEAF_SIZE, max))/6;
                     r = Random.Range(1,3);
                     split = split2*r;
-                rightChild = new Leaf(xx+_roomSpacePercentage + split, yy+_roomSpacePercentage,  
+                rightChild = new Leaf(xx+_roomSpacePercentage + split, yy/2+_roomSpacePercentage,  
                                     width - split, height,_wall, _floor);
             }
            

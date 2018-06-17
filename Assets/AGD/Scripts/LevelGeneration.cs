@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
 public class LevelGeneration : MonoBehaviour
 {
@@ -10,27 +11,27 @@ public class LevelGeneration : MonoBehaviour
    // [SerializeField] private int Map.GetLength(0);
    // [SerializeField] private int Map.GetLength(1);
     [SerializeField][Range(0, 1)] private float _wallPercentage;
-    [SerializeField] private int MAX_LEAF_SIZE = 40;
+    [SerializeField] private int MAX_LEAF_SIZE = 20;
 
     [Header("Level Generation")]
     [SerializeField] [Range(0, 10)] private int _simulationSteps;
-    [SerializeField] [Range(0, 9)] private int _birthLimit;
-    [SerializeField] [Range(0, 9)] private int _starvationLimit;
+    [SerializeField] [Range(0, 5)] private int _birthLimit;
+    [SerializeField] [Range(0, 5)] private int _starvationLimit;
+    [Tooltip("Amount of fill required for the level to be considered \"Worthy\" to use.")]
+    [SerializeField] [Range(0, 0.75f)] private float _minimumFillPercentage;
 
     [Header("Level Generation - Entities")]
     [SerializeField] private float _minLengthSpawnEnd;
     [SerializeField] private float _minLengthEnemies;
     [SerializeField] [Range(0, 10)] private int _amountOfEnemies;
-
-    [Header("Level Confirmation")]
-    [Tooltip("Amount of fill required for the level to be considered \"Worthy\" to use.")]
-    [SerializeField] [Range(0, 1)] private float _minimumFillPercentage;
-
+    [SerializeField] [Range(10, 50)] private int _amountOfCoins;
+    [SerializeField] [Range(0, 10)] private int _amountOfBatteries; 
+    
     [Header("Level Creation - Prefabs")]
     [SerializeField] private GameObject _wall;
     [SerializeField] private GameObject _floor;
 
-    [Header("Level Creation - Offsets")]
+    [Header("Level Creation - Y Offsets")]
     [SerializeField] private float _wallOffset;
     [SerializeField] private float _floorOffset;
 
@@ -38,12 +39,17 @@ public class LevelGeneration : MonoBehaviour
     [SerializeField] private GameObject _playerSpawner;
     [SerializeField] private GameObject _enemySpawner;
     [SerializeField] private GameObject _endOfLevel;
+    [SerializeField] private GameObject _coin;
+    [SerializeField] private GameObject _battery;
 
-    [Header("Entity Spawning - Offsets")]
+    [Header("Entity Spawning - Y Offsets")]
     [SerializeField] private float _playerOffset;
     [SerializeField] private float _enemySpawnerOffset;
     [SerializeField] private float _endOfLevelOffset;
+    [SerializeField] private float _coinOffset;
+    [SerializeField] private float _batteryOffset;
 
+    private List<Vector2Int> _usedPickUpLocations = new List<Vector2Int>();
     private const bool DEBUG_MODE = true;
        
     //also use player spawn min/max for the end of the level
@@ -57,6 +63,7 @@ public class LevelGeneration : MonoBehaviour
     private GameObject EntitiesParent { get; set; }
     private int[,] Map { get; set; }
     private bool[,] Visited { get; set; }
+    private bool NavMeshDirty { get; set; }
 
     /// <summary>
     /// Initializes the base of the map. Meaning a completely random map, with
@@ -66,13 +73,13 @@ public class LevelGeneration : MonoBehaviour
     /// </summary>
     private void InitializeMap()
     {
-        Map = new int[levelWidth,levelHeight];
-        Visited = new bool[levelWidth,levelHeight];
+        
         for(int i = 0; i < levelWidth;i++)
         {
             for(int j = 0; j <levelHeight;j++)
             {
                 Map[i, j] = 2;
+                
             }
         }
        createRooms();
@@ -280,12 +287,17 @@ public class LevelGeneration : MonoBehaviour
     /// to the full map </returns>
     private float FindLevelSize()
     {
-        int totalSize = Map.GetLength(0) * Map.GetLength(1);
+        int totalSize = 0;
         int currentSize = 0;
 
         for (int x = 0; x < Map.GetLength(0); x++)
             for (int y = 0; y < Map.GetLength(1); y++)
-                currentSize += Map[x, y] == 0 ? 1 : 0;
+            {
+                 currentSize += Map[x, y] == 0 ? 1 : 0;
+                 totalSize += Map[x, y] == 1 ? 1 : 0;
+            }
+            totalSize += currentSize;
+               
 
         return (float)currentSize / totalSize;
     }
@@ -297,11 +309,7 @@ public class LevelGeneration : MonoBehaviour
     {
         InitializeMap();
 
-        for (int i = 0; i < _simulationSteps; i++)
-            DoSimulationStep();
-
-        FixLevelGaps();
-
+      
         if (FindLevelSize() < _minimumFillPercentage)
         {
             GenerateLevel();
@@ -309,21 +317,6 @@ public class LevelGeneration : MonoBehaviour
         }
 
         //Clear the level in case there is already one generated.
-        ClearLevel();
-
-        for (int x = 0; x < Map.GetLength(0); x++)
-        {
-            for (int y = 0; y < Map.GetLength(1); y++)
-            {
-                GameObject go = Instantiate(Map[x, y] == 1 ? _wall : _floor);
-                go.transform.position = new Vector3(
-                    x * go.transform.localScale.x, 
-                    Map[x, y] == 1 ? _wallOffset : _floorOffset, 
-                    y * go.transform.localScale.z);
-                go.transform.parent = transform;
-            }
-        }
-
         float lengthSpawnToEnd = 0;
         GameObject playerSpawner = Instantiate(_playerSpawner);
         GameObject endLevel = Instantiate(_endOfLevel);
@@ -338,8 +331,13 @@ public class LevelGeneration : MonoBehaviour
 
         for (int i = 0; i < _amountOfEnemies; i++)
         {
-            SpawnEnemy(ref playerSpawner, 99);
+            SpawnEnemy(ref playerSpawner, 9999);
         }
+
+        AddPickupSpawns(_coin, _amountOfCoins, 9999);
+        AddPickupSpawns(_battery, _amountOfBatteries, 9999);
+
+        NavMeshDirty = true;
     }
 
     //TODO: Actually fucking comment this. :)
@@ -418,6 +416,56 @@ public class LevelGeneration : MonoBehaviour
             _endOfLevelOffset,
             spawnLocation.y * endLevel.transform.localScale.z);
         endLevel.transform.parent = EntitiesParent.transform;
+    }
+
+    /// <summary>
+    /// Spawns pickup location using the MIN_NEIGHBOURS_PICKUP_SPAWN and MAX_NEIGHBOURS_PICKUP_SPAWN as references to where they have to spawn
+    /// </summary>
+    /// <param name="go">The Pickup to spawn</param>
+    /// <param name="amount">The amount of pickups of this type that have to spawn</param>
+    /// <param name="maxTries">The maximum amount of tries to find a good spawning location</param>
+    private void AddPickupSpawns(GameObject go, int amount, int maxTries)
+    {
+        Vector2Int location = Vector2Int.zero;
+        bool locationFound;
+        int tries = 0;
+
+        for (int i = 0; i < amount; i++)
+        {
+            locationFound = false;
+            while (!locationFound && tries < maxTries) 
+            {
+                location = FindRandomEntityLocation(MIN_NEIGHBOURS_PICKUP_SPAWN, MAX_NEIGHBOURS_PICKUP_SPAWN);
+                if (_usedPickUpLocations.Count == 0)
+                {
+                    locationFound = true;
+                    _usedPickUpLocations.Add(location);
+                }
+
+                for (int j = 0; j < _usedPickUpLocations.Count; j++)
+                {
+                    if (location != _usedPickUpLocations[j])
+                    {
+                        locationFound = true;
+                        _usedPickUpLocations.Add(location);
+                        break;
+                    }
+                }
+
+                tries++;
+            }
+
+            if (locationFound)
+            {
+                Transform t = Instantiate(go).transform;
+                t.position = new Vector3(
+                    location.x * _coin.transform.localScale.x,
+                    _coinOffset,
+                    location.y * _coin.transform.localScale.z);
+                t.parent = EntitiesParent.transform;
+            }
+            else { Debug.Log("No Location found"); }
+        }
     }
 
     /// <summary>
@@ -609,18 +657,25 @@ public class LevelGeneration : MonoBehaviour
         FloodFill(x + 1, y);
     }
 
-
 #region Unity Methods
 
     private void Start ()
     {
+        Map = new int[levelWidth,levelHeight];
+        Visited = new bool[levelWidth,levelHeight];
         EntitiesParent = new GameObject("_Entities");
-        InitializeMap();
-        //GenerateLevel();
+        NavMeshDirty = true;
+        GenerateLevel();
 	}
 
     private void Update()
     {
+        if (NavMeshDirty)
+        {
+            GetComponent<NavMeshSurface>().BuildNavMesh();
+            NavMeshDirty = false;
+        }
+
         if (Input.GetKeyDown(KeyCode.R))
         {
         
